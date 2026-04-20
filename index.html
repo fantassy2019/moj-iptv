@@ -1,70 +1,64 @@
 <!DOCTYPE html>
-<html lang="hr">
+<html>
 <head>
     <meta charset="UTF-8">
-    <title>BalkanTV Offline Player</title>
+    <title>BalkanTV Direct</title>
     <style>
-        body { background: #000; color: white; font-family: sans-serif; margin: 0; text-align: center; }
-        #login-box { margin-top: 100px; display: inline-block; background: #111; padding: 30px; border-radius: 10px; }
-        input { display: block; width: 250px; padding: 10px; margin: 10px 0; background: #222; color: white; border: 1px solid #444; }
-        button { width: 100%; padding: 10px; background: red; color: white; border: none; cursor: pointer; font-weight: bold; }
-        #player-ui { display: none; }
-        #channel-list { position: absolute; left: 0; top: 0; width: 250px; height: 100%; background: rgba(0,0,0,0.9); overflow-y: auto; text-align: left; border-right: 1px solid red; }
-        .chan { padding: 10px; border-bottom: 1px solid #222; cursor: pointer; font-size: 13px; }
-        .chan:hover { background: red; }
-        video { width: 100vw; height: 100vh; }
+        body { background: #000; color: #fff; font-family: sans-serif; text-align: center; }
+        .container { margin-top: 50px; }
+        .btn { background: red; color: white; padding: 20px; border: none; cursor: pointer; font-size: 20px; border-radius: 10px; }
+        #list { margin-top: 20px; display: none; background: #111; padding: 20px; }
+        .ch { padding: 10px; border-bottom: 1px solid #333; cursor: pointer; }
     </style>
 </head>
 <body>
 
-<div id="login-box">
-    <h2>IPTV PRIJAVA</h2>
-    <input type="text" id="h" placeholder="Host (http://...:port)">
-    <input type="text" id="u" placeholder="Korisničko ime">
-    <input type="password" id="p" placeholder="Lozinka">
-    <button onclick="pokreni()">ULAZ</button>
+<div class="container" id="main">
+    <h1>BALKAN TV</h1>
+    <button class="btn" onclick="prikaziKanale()">UČITAJ MOJE KANALE</button>
 </div>
 
-<div id="player-ui">
-    <div id="channel-list"></div>
-    <video id="vid" controls autoplay></video>
+<div id="list">
+    <h3>Lista kanala:</h3>
+    <div id="items">Povezivanje...</div>
 </div>
+
+<video id="v" controls style="width:100%; height:80vh; display:none;"></video>
 
 <script>
-    function pokreni() {
-        const host = document.getElementById('h').value;
-        const user = document.getElementById('u').value;
-        const pass = document.getElementById('p').value;
+    function prikaziKanale() {
+        document.getElementById('main').style.display = 'none';
+        document.getElementById('list').style.display = 'block';
         
-        if(!host || !user || !pass) return alert("Popunite polja!");
+        // Koristimo drugi tip proxy-ja koji često prolazi tamo gde drugi ne mogu
+        const link = "http://balkantv.net:25461/get.php?username=vedoprivat123&password=Pk26jxo95yoeM93&type=m3u_plus&output=mpegts";
+        const proxy = "https://allorigins.win";
 
-        document.getElementById('login-box').style.display = 'none';
-        document.getElementById('player-ui').style.display = 'block';
-
-        const link = `${host}/get.php?username=${user}&password=${pass}&type=m3u_plus&output=m3u8`;
-        
-        // Pokušavamo dohvatiti listu preko drugog proxyja koji možda nije blokiran
-        fetch("https://allorigins.win" + encodeURIComponent(link))
+        fetch(proxy + encodeURIComponent(link))
             .then(r => r.text())
             .then(data => {
                 const lines = data.split('\n');
-                const list = document.getElementById('channel-list');
+                let html = "";
                 lines.forEach((line, i) => {
                     if(line.includes('#EXTINF')) {
                         const name = line.split(',').pop();
-                        const url = lines[i+1].trim();
-                        const div = document.createElement('div');
-                        div.className = 'chan';
-                        div.innerText = name;
-                        div.onclick = () => {
-                            document.getElementById('vid').src = url;
-                            document.getElementById('vid').play();
-                        };
-                        list.appendChild(div);
+                        const url = lines[i+1]?.trim();
+                        html += `<div class="ch" onclick="pusti('${url}')">${name}</div>`;
                     }
                 });
+                document.getElementById('items').innerHTML = html;
             })
-            .catch(() => alert("Lista se ne može učitati. Provjerite podatke ili internet blokadu."));
+            .catch(e => {
+                document.getElementById('items').innerHTML = "SERVER BLOKIRA PRISTUP. Probajte preko mobilnog interneta (hotspot).";
+            });
+    }
+
+    function pusti(url) {
+        const video = document.getElementById('v');
+        document.getElementById('list').style.display = 'none';
+        video.style.display = 'block';
+        video.src = url;
+        video.play();
     }
 </script>
 </body>
