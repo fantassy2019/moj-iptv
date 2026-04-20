@@ -2,83 +2,99 @@
 <html lang="hr">
 <head>
     <meta charset="UTF-8">
-    <title>BalkanTV Player</title>
-    <script src="https://jsdelivr.net"></script>
+    <title>BalkanTV Modern UI</title>
     <style>
-        body { background: #000; color: white; font-family: sans-serif; margin: 0; overflow: hidden; }
-        #menu { position: absolute; top: 0; left: 0; width: 320px; height: 100%; background: rgba(0,0,0,0.9); z-index: 100; overflow-y: auto; padding: 20px; transform: translateX(-100%); transition: 0.3s; border-right: 2px solid red; }
-        #menu.active { transform: translateX(0); }
-        .kanal { padding: 12px; border-bottom: 1px solid #333; cursor: pointer; background: #111; margin-bottom: 5px; border-radius: 4px; }
-        .kanal:hover { background: red; }
-        video { width: 100vw; height: 100vh; background: #000; }
-        #status { position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.5); padding: 10px; font-size: 12px; }
+        body { 
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); 
+            color: white; font-family: 'Segoe UI', sans-serif; 
+            margin: 0; display: flex; align-items: center; justify-content: center; height: 100vh;
+        }
+
+        .container { text-align: center; width: 90%; }
+        
+        .header { margin-bottom: 50px; }
+        .header h1 { font-size: 3em; margin: 0; color: #e94560; text-transform: uppercase; letter-spacing: 3px; }
+
+        .menu-grid { 
+            display: grid; 
+            grid-template-columns: repeat(3, 1fr); 
+            gap: 25px; 
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 40px;
+            border-radius: 20px;
+            border: 2px solid transparent;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-decoration: none;
+            color: white;
+        }
+
+        /* Efekt kad se pređe daljinskim ili mišem */
+        .card:hover, .card:focus {
+            background: #e94560;
+            transform: translateY(-10px);
+            border-color: white;
+            box-shadow: 0 10px 30px rgba(233, 69, 96, 0.5);
+            outline: none;
+        }
+
+        .card i { font-size: 50px; display: block; margin-bottom: 20px; }
+        .card h2 { margin: 0; font-size: 1.5em; }
+
+        #status-bar { position: absolute; bottom: 20px; font-size: 0.9em; opacity: 0.6; }
     </style>
 </head>
 <body>
 
-<div id="status">Pritisni OK za kanale</div>
-<div id="menu"><h2>Lista Kanala</h2><div id="lista">Učitavam...</div></div>
-<video id="video" controls autoplay></video>
+<div class="container">
+    <div class="header">
+        <h1>Balkan TV</h1>
+        <p>Odaberite kategoriju</p>
+    </div>
+
+    <div class="menu-grid">
+        <!-- LIVE TV -->
+        <a href="#" class="card" id="live-btn" onclick="otvoriPlayer()">
+            <div style="font-size: 40px;">📺</div>
+            <h2>UŽIVO TV</h2>
+        </a>
+
+        <!-- FILMOVI -->
+        <a href="#" class="card">
+            <div style="font-size: 40px;">🎬</div>
+            <h2>FILMOVI</h2>
+        </a>
+
+        <!-- SERIJE -->
+        <a href="#" class="card">
+            <div style="font-size: 40px;">🍿</div>
+            <h2>SERIJE</h2>
+        </a>
+    </div>
+
+    <div id="status-bar">Korisnik: vedoprivat123 | Status: Aktivan</div>
+</div>
 
 <script>
-    const video = document.getElementById('video');
-    const listaDiv = document.getElementById('lista');
-    const statusDiv = document.getElementById('status');
-    
-    // VAŠ LINK (Sada koristimo m3u8 umjesto mpegts jer ga preglednici bolje podržavaju)
-    const mojLink = "http://balkantv.net";
-
-    async function ucitajListu() {
-        try {
-            statusDiv.innerText = "Pokušavam dohvatiti listu...";
-            const response = await fetch(mojLink);
-            
-            if (!response.ok) throw new Error('Server ne odgovara');
-            
-            const data = await response.text();
-            if (data.includes('#EXTM3U')) {
-                parsiraj(data);
-                statusDiv.innerText = "Lista učitana! Pritisni OK.";
-            } else {
-                statusDiv.innerText = "Server vratio praznu listu ili grešku.";
-            }
-        } catch (err) {
-            console.error(err);
-            statusDiv.innerHTML = "<b>CORS BLOKADA!</b><br>Vaš laptop blokira pristup.<br>Pokušajte otvoriti na Smart TV-u.";
-            listaDiv.innerHTML = "<p style='color:orange'>Ako ste na laptopu, instalirajte 'Allow CORS' dodatak u Chromeu ili pokušajte otvoriti stranicu na TV-u.</p>";
-        }
+    // Funkcija koja će kasnije otvarati tvoj player s kanalima
+    function otvoriPlayer() {
+        alert("Pokrećem učitavanje kanala...");
+        // Ovdje ćemo povezati tvoj stari kod za listu
     }
 
-    function parsiraj(data) {
-        listaDiv.innerHTML = "";
-        const linije = data.split('\n');
-        linije.forEach((linija, i) => {
-            if (linija.startsWith('#EXTINF')) {
-                const ime = linija.split(',').pop();
-                const url = linije[i+1]?.trim();
-                if (url && url.startsWith('http')) {
-                    const d = document.createElement('div');
-                    d.className = 'kanal';
-                    d.innerText = ime;
-                    d.onclick = () => {
-                        if (Hls.isSupported()) {
-                            const hls = new Hls();
-                            hls.loadSource(url);
-                            hls.attachMedia(video);
-                        } else { video.src = url; }
-                        document.getElementById('menu').classList.remove('active');
-                    };
-                    listaDiv.appendChild(d);
-                }
-            }
-        });
-    }
-
+    // Dodatak za daljinski: navigacija strelicama
     document.addEventListener('keydown', (e) => {
-        if (e.keyCode === 13) document.getElementById('menu').classList.toggle('active');
+        const cards = document.querySelectorAll('.card');
+        let current = document.activeElement;
+        // Jednostavna logika za fokusiranje prve kartice na početku
+        if (!current || current === document.body) {
+            cards[0].focus();
+        }
     });
-
-    ucitajListu();
 </script>
+
 </body>
 </html>
