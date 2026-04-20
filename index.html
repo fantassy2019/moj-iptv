@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="hr">
+<head>
+    <meta charset="UTF-8">
+    <title>Moj Smart TV Player</title>
+    <script src="https://jsdelivr.net"></script>
+    <style>
+        body { background: #000; color: white; font-family: sans-serif; margin: 0; overflow: hidden; }
+        #video-container { width: 100vw; height: 100vh; position: relative; }
+        video { width: 100%; height: 100%; }
+        
+        /* Izbornik kanala s lijeve strane */
+        #menu { 
+            position: absolute; top: 0; left: 0; width: 250px; height: 100%; 
+            background: rgba(0,0,0,0.8); padding: 20px; transition: 0.5s;
+            transform: translateX(-100%); /* Sakriveno dok se ne klikne */
+        }
+        #menu.active { transform: translateX(0); }
+        .kanal { padding: 15px; border-bottom: 1px solid #333; cursor: pointer; }
+        .kanal:hover { background: #222; }
+    </style>
+</head>
+<body>
+
+<div id="video-container">
+    <video id="video" controls></video>
+    
+    <div id="menu">
+        <h3>Lista Kanala</h3>
+        <div class="kanal" onclick="playM3U8('LINK_DO_TV_KANALA_1')">Kanal 1</div>
+        <div class="kanal" onclick="playM3U8('LINK_DO_TV_KANALA_2')">Kanal 2</div>
+    </div>
+</div>
+
+<script>
+    const video = document.getElementById('video');
+
+    function playM3U8(url) {
+        if (Hls.isSupported()) {
+            const hls = new Hls();
+            hls.loadSource(url);
+            hls.attachMedia(video);
+            hls.on(Hls.Events.MANIFEST_PARSED, function() {
+                video.play();
+            });
+        } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+            // Za uređaje koji nativno podržavaju HLS (kao Safari ili neki TV-i)
+            video.src = url;
+            video.play();
+        }
+        toggleMenu(); // Zatvori menu nakon odabira
+    }
+
+    // Funkcija za prikazivanje menija na tipku daljinskog (npr. 'OK' ili 'Menu')
+    function toggleMenu() {
+        document.getElementById('menu').classList.toggle('active');
+    }
+
+    // Osluškivanje tipki na daljinskom
+    document.addEventListener('keydown', function(e) {
+        if (e.keyCode === 13) { // Enter/OK tipka
+            toggleMenu();
+        }
+    });
+</script>
+
+</body>
+</html>
