@@ -2,73 +2,136 @@
 <html lang="hr">
 <head>
     <meta charset="UTF-8">
-    <title>BalkanTV Player</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Moj IPTV Player</title>
+    <!-- HLS biblioteka za reprodukciju streamova -->
     <script src="https://jsdelivr.net"></script>
     <style>
-        body { background: #000; color: white; font-family: sans-serif; margin: 0; }
-        #menu { position: absolute; top: 0; left: 0; width: 300px; height: 100%; background: rgba(0,0,0,0.9); z-index: 100; overflow-y: auto; padding: 10px; transform: translateX(-100%); transition: 0.3s; }
+        body { background: #000; color: white; font-family: sans-serif; margin: 0; overflow: hidden; }
+        
+        /* Video preko cijelog ekrana */
+        #video-container { width: 100vw; height: 100vh; position: relative; background: #000; }
+        video { width: 100%; height: 100%; }
+
+        /* Bočni meni sa kanalima */
+        #menu { 
+            position: absolute; top: 0; left: 0; width: 320px; height: 100%; 
+            background: rgba(0, 0, 0, 0.95); padding: 20px; box-sizing: border-box;
+            transition: 0.4s; transform: translateX(-100%); z-index: 100;
+            overflow-y: auto; border-right: 3px solid #ff0000;
+        }
         #menu.active { transform: translateX(0); }
-        .kanal { padding: 10px; border-bottom: 1px solid #333; cursor: pointer; background: #111; margin-bottom: 2px; }
-        .kanal:hover { background: #ed1c24; }
-        video { width: 100vw; height: 100vh; background: #000; }
-        #upute { position: absolute; top: 10px; right: 10px; background: rgba(255,0,0,0.7); padding: 10px; border-radius: 5px; }
+
+        .kanal { 
+            padding: 15px; margin-bottom: 8px; cursor: pointer; 
+            background: #1a1a1a; border-radius: 8px; font-size: 16px;
+            transition: 0.2s; border-left: 5px solid transparent;
+        }
+        .kanal:hover { background: #333; border-left: 5px solid #ff0000; }
+
+        /* Poruka za upute */
+        #upute {
+            position: absolute; bottom: 20px; right: 20px;
+            background: rgba(0,0,0,0.6); padding: 10px 20px;
+            border-radius: 20px; border: 1px solid #444;
+            font-size: 14px; pointer-events: none;
+        }
+
+        #loader { text-align: center; margin-top: 50px; color: #aaa; }
     </style>
 </head>
 <body>
 
-<div id="upute">Pritisni ENTER/OK za listu</div>
-<div id="menu"><h2>Kanali</h2><div id="lista">Učitavam...</div></div>
-<video id="video" controls autoplay></video>
+<div id="video-container">
+    <video id="video" controls autoplay></video>
+    
+    <div id="upute">Pritisnite <b>ENTER / OK</b> za listu kanala</div>
+
+    <div id="menu">
+        <h2 style="color:#ff0000;">BalkanTV Lista</h2>
+        <div id="lista-kanala"><div id="loader">Učitavam listu...</div></div>
+    </div>
+</div>
 
 <script>
     const video = document.getElementById('video');
-    const listaDiv = document.getElementById('lista');
-    
-    // KORISTIMO PROXY DA ZAOBIĐEMO BLOKADU
-    const proxy = "https://herokuapp.com";
-    const mojLink = "http://balkantv.net";
+    const menu = document.getElementById('menu');
+    const listaKanala = document.getElementById('lista-kanala');
 
-    async function dohvatiListu() {
+    // TVOJA PLAYLISTA + PROXY (da izbjegnemo CORS grešku)
+    const rawLink = "http://balkantv.net";
+    const proxy = "https://corsproxy.io?";
+    const m3uUrl = proxy + encodeURIComponent(rawLink);
+
+    // Funkcija za dohvaćanje liste
+    async function ucitajSve() {
         try {
-            // Prvo pokušavamo direktno, ako ne radi, javi grešku
-            const res = await fetch(mojLink);
-            const data = await res.text();
-            parsiraj(data);
-        } catch (e) {
-            listaDiv.innerHTML = "Problem s povezivanjem. Provjerite link ili CORS.";
+            const response = await fetch(m3uUrl);
+            const data = await response.text();
+            
+            if (data.includes('#EXTM3U')) {
+                parsirajM3U(data);
+            } else {
+                listaKanala.innerHTML = "<div style='color:red;'>Greška: Server nije vratio ispravnu listu.</div>";
+            }
+        } catch (err) {
+            listaKanala.innerHTML = "<div style='color:red;'>Greška: Problem sa povezivanjem (CORS).</div>";
         }
     }
 
-    function parsiraj(data) {
-        listaDiv.innerHTML = "";
-        const linije = data.split('\n');
+    // Funkcija za obradu M3U teksta
+    function parsirajM3U(tekst) {
+        listaKanala.innerHTML = "";
+        const linije = tekst.split('\n');
+        
         for (let i = 0; i < linije.length; i++) {
-            if (linije[i].includes('#EXTINF')) {
-                const ime = linije[i].split(',')[1] || "Kanal";
-                const url = linije[i+1].trim();
-                const d = document.createElement('div');
-                d.className = 'kanal';
-                d.innerText = ime;
-                d.onclick = () => {
-                    if (Hls.isSupported()) {
-                        const hls = new Hls();
-                        hls.loadSource(url);
-                        hls.attachMedia(video);
-                    } else {
-                        video.src = url;
-                    }
-                    document.getElementById('menu').classList.remove('active');
-                };
-                listaDiv.appendChild(d);
+            if (linije[i].startsWith('#EXTINF')) {
+                // Izvlačenje imena kanala
+                const info = linije[i].split(',');
+                const ime = info[info.length - 1].trim();
+                const url = linije[i + 1].trim();
+
+                // Kreiranje gumba za svaki kanal
+                const div = document.createElement('div');
+                div.className = 'kanal';
+                div.innerText = ime;
+                div.onclick = () => pokreniVideo(url);
+                listaKanala.appendChild(div);
             }
         }
     }
 
-    document.addEventListener('keydown', (e) => {
-        if (e.keyCode === 13) document.getElementById('menu').classList.toggle('active');
+    // Funkcija za pokretanje videa
+    function pokreniVideo(url) {
+        // Sakrij meni
+        menu.classList.remove('active');
+
+        if (Hls.isSupported()) {
+            const hls = new Hls();
+            hls.loadSource(url);
+            hls.attachMedia(video);
+            hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                video.play();
+            });
+        } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+            video.src = url;
+            video.play();
+        }
+    }
+
+    // Upravljanje tipkama (OK/Enter otvara listu)
+    document.addEventListener('keydown', function(e) {
+        if (e.keyCode === 13) { // Enter ili OK na daljinskom
+            menu.classList.toggle('active');
+        }
+        if (e.keyCode === 27 || e.keyCode === 8) { // Back ili Esc zatvara listu
+            menu.classList.remove('active');
+        }
     });
 
-    dohvatiListu();
+    // Pokreni aplikaciju
+    ucitajSve();
 </script>
+
 </body>
 </html>
