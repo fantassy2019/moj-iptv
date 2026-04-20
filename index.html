@@ -2,100 +2,70 @@
 <html lang="hr">
 <head>
     <meta charset="UTF-8">
-    <title>BalkanTV Ultra Player</title>
-    <!-- Video.js standardna šablona za TV -->
-    <link href="https://zencdn.net" rel="stylesheet" />
-    <script src="https://zencdn.net"></script>
+    <title>BalkanTV Offline Player</title>
     <style>
-        body { background: #050505; color: white; font-family: 'Segoe UI', sans-serif; margin: 0; }
-        .vjs-matrix.video-js { color: #ff0000; }
-        
-        /* Login stilovi */
-        #login-overlay { position: fixed; inset: 0; background: #0a0a0a; display: flex; align-items: center; justify-content: center; z-index: 1000; }
-        .login-card { background: #1a1a1a; padding: 40px; border-radius: 15px; width: 320px; border: 1px solid #333; text-align: center; }
-        input { width: 100%; padding: 12px; margin: 10px 0; border-radius: 5px; border: 1px solid #444; background: #000; color: white; box-sizing: border-box; }
-        button { width: 100%; padding: 15px; background: #e50914; border: none; color: white; font-weight: bold; border-radius: 5px; cursor: pointer; margin-top: 10px; }
-        
-        /* Lista kanala */
-        #channel-bar { position: absolute; left: 0; top: 0; width: 280px; height: 100%; background: rgba(0,0,0,0.9); z-index: 500; overflow-y: auto; display: none; border-right: 2px solid #e50914; }
-        .ch-item { padding: 15px; border-bottom: 1px solid #222; cursor: pointer; font-size: 14px; }
-        .ch-item:hover { background: #e50914; }
+        body { background: #000; color: white; font-family: sans-serif; margin: 0; text-align: center; }
+        #login-box { margin-top: 100px; display: inline-block; background: #111; padding: 30px; border-radius: 10px; }
+        input { display: block; width: 250px; padding: 10px; margin: 10px 0; background: #222; color: white; border: 1px solid #444; }
+        button { width: 100%; padding: 10px; background: red; color: white; border: none; cursor: pointer; font-weight: bold; }
+        #player-ui { display: none; }
+        #channel-list { position: absolute; left: 0; top: 0; width: 250px; height: 100%; background: rgba(0,0,0,0.9); overflow-y: auto; text-align: left; border-right: 1px solid red; }
+        .chan { padding: 10px; border-bottom: 1px solid #222; cursor: pointer; font-size: 13px; }
+        .chan:hover { background: red; }
+        video { width: 100vw; height: 100vh; }
     </style>
 </head>
 <body>
 
-<div id="login-overlay">
-    <div class="login-card">
-        <h2 style="color:#e50914">BALKAN TV</h2>
-        <input type="text" id="host" placeholder="Host (http://balkantv.net:25461)">
-        <input type="text" id="user" placeholder="Username">
-        <input type="password" id="pass" placeholder="Password">
-        <button onclick="startApp()">POKRENI</button>
-    </div>
+<div id="login-box">
+    <h2>IPTV PRIJAVA</h2>
+    <input type="text" id="h" placeholder="Host (http://...:port)">
+    <input type="text" id="u" placeholder="Korisničko ime">
+    <input type="password" id="p" placeholder="Lozinka">
+    <button onclick="pokreni()">ULAZ</button>
 </div>
 
-<div id="main-ui" style="display:none">
-    <div id="channel-bar"></div>
-    <video id="my-video" class="video-js vjs-big-play-centered vjs-fill" controls preload="auto" data-setup="{}"></video>
+<div id="player-ui">
+    <div id="channel-list"></div>
+    <video id="vid" controls autoplay></video>
 </div>
 
 <script>
-    let player = videojs('my-video');
-
-    function startApp() {
-        const h = document.getElementById('host').value;
-        const u = document.getElementById('user').value;
-        const p = document.getElementById('pass').value;
+    function pokreni() {
+        const host = document.getElementById('h').value;
+        const user = document.getElementById('u').value;
+        const pass = document.getElementById('p').value;
         
-        if (!h || !u || !p) return alert("Popunite sve!");
+        if(!host || !user || !pass) return alert("Popunite polja!");
 
-        document.getElementById('login-overlay').style.display = 'none';
-        document.getElementById('main-ui').style.display = 'block';
+        document.getElementById('login-box').style.display = 'none';
+        document.getElementById('player-ui').style.display = 'block';
 
-        loadM3U(h, u, p);
+        const link = `${host}/get.php?username=${user}&password=${pass}&type=m3u_plus&output=m3u8`;
+        
+        // Pokušavamo dohvatiti listu preko drugog proxyja koji možda nije blokiran
+        fetch("https://allorigins.win" + encodeURIComponent(link))
+            .then(r => r.text())
+            .then(data => {
+                const lines = data.split('\n');
+                const list = document.getElementById('channel-list');
+                lines.forEach((line, i) => {
+                    if(line.includes('#EXTINF')) {
+                        const name = line.split(',').pop();
+                        const url = lines[i+1].trim();
+                        const div = document.createElement('div');
+                        div.className = 'chan';
+                        div.innerText = name;
+                        div.onclick = () => {
+                            document.getElementById('vid').src = url;
+                            document.getElementById('vid').play();
+                        };
+                        list.appendChild(div);
+                    }
+                });
+            })
+            .catch(() => alert("Lista se ne može učitati. Provjerite podatke ili internet blokadu."));
     }
-
-    async function loadM3U(h, u, p) {
-        const url = `${h}/get.php?username=${u}&password=${p}&type=m3u_plus&output=m3u8`;
-        const proxy = "https://allorigins.win";
-
-        try {
-            const res = await fetch(proxy + encodeURIComponent(url));
-            const data = await res.text();
-            parse(data);
-        } catch (e) {
-            alert("Greška: CORS ili Mreža. Provjerite dodatke.");
-        }
-    }
-
-    function parse(data) {
-        const bar = document.getElementById('channel-bar');
-        const lines = data.split('\n');
-        lines.forEach((line, i) => {
-            if (line.includes('#EXTINF')) {
-                const name = line.split(',').pop();
-                const link = lines[i+1]?.trim();
-                const div = document.createElement('div');
-                div.className = 'ch-item';
-                div.innerText = name;
-                div.onclick = () => {
-                    player.src({ type: 'application/x-mpegURL', src: link });
-                    player.play();
-                    bar.style.display = 'none';
-                };
-                bar.appendChild(div);
-            }
-        });
-        bar.style.display = 'block'; // Prikaži listu nakon učitavanja
-    }
-
-    // Tipka OK/Enter za listu
-    document.addEventListener('keydown', (e) => {
-        if (e.keyCode === 13) {
-            const bar = document.getElementById('channel-bar');
-            bar.style.display = bar.style.display === 'none' ? 'block' : 'none';
-        }
-    });
 </script>
 </body>
 </html>
